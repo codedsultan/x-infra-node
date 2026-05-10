@@ -84,8 +84,8 @@ jobs:
 
       - name: Write Ansible vault password
         run: |
-          echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > ~/.ansible_vault
-          chmod 600 ~/.ansible_vault
+          echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > ~/.ansible_vault_xurl
+          chmod 600 ~/.ansible_vault_xurl
 
       - name: Deploy
         working-directory: ansible
@@ -127,19 +127,19 @@ jobs:
           echo "| Tag | \`${{ env.TAG }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Triggered By | @${{ env.TRIGGERED_BY }} |" >> $GITHUB_STEP_SUMMARY
 
-      - name: Comment on source commit
-        if: always() && github.event.client_payload.repo != ''
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.INFRA_REPO_PAT }}
-          script: |
-            const [owner, repo] = '${{ github.event.client_payload.repo }}'.split('/');
-            const sha = '${{ github.event.client_payload.commit_sha }}';
-            const status = '${{ job.status }}';
-            const icon = status === 'success' ? '✅' : '❌';
+      # - name: Comment on source commit
+      #   if: always() && github.event.client_payload.repo != ''
+      #   uses: actions/github-script@v7
+      #   with:
+      #     github-token: ${{ secrets.SOURCE_REPO_PAT }}
+      #     script: |
+      #       const [owner, repo] = '${{ github.event.client_payload.repo }}'.split('/');
+      #       const sha = '${{ github.event.client_payload.commit_sha }}';
+      #       const status = '${{ job.status }}';
+      #       const icon = status === 'success' ? '✅' : '❌';
 
-            await github.rest.repos.createCommitComment({
-              owner, repo,
-              commit_sha: sha,
-              body: `${icon} **Deployment to \`${{ env.ENVIRONMENT }}\` ${status}**\n\n- Tag: \`${{ env.TAG }}\`\n- [View logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`
-            });
+      #       await github.rest.repos.createCommitComment({
+      #         owner, repo,
+      #         commit_sha: sha,
+      #         body: `${icon} **Deployment to \`${{ env.ENVIRONMENT }}\` ${status}**\n\n- Tag: \`${{ env.TAG }}\`\n- [View logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`
+      #       });
