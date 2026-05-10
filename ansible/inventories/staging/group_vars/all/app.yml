@@ -87,10 +87,10 @@ app:
           start_period: "20s"
 
       # Optional background worker — remove if not needed
-      worker:
-        command: ["node", "worker.js"]
-        env_file: ".env"
-        depends_on: ["app"]
+      # worker:
+      #   command: ["node", "worker.js"]
+      #   env_file: ".env"
+      #   depends_on: ["app"]
 
   # -----------------------------------------------------------------------
   # Named volumes (remove if your app has no persistent storage)

@@ -3,12 +3,13 @@
 deploy_env: staging   # override to "production" in production inventory
 
 # Where app compose files + .env files live on the server
-apps_base_dir: /opt/apps
+apps_base_dir: "/srv/apps"
 
 # Caddy proxy
-proxy_base_dir: /opt/caddy
+proxy_base_dir: "/srv/proxy"
+
 caddy:
-  container_name: caddy
+  container_name: "platform-caddy"
 
 # Cluster Docker networks (pre-existing)
 cluster_network: "cluster_{{ deploy_env }}_shared"
