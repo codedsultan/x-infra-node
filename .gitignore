@@ -1,7 +1,7 @@
 # Never commit unencrypted vault files
 # (encrypt with: ansible-vault encrypt ansible/inventories/*/group_vars/all/vault.yml)
-ansible/inventories/*/group_vars/all/vault.yml
-!ansible/inventories/*/group_vars/all/vault.yml.example
+# ansible/inventories/*/group_vars/all/vault.yml
+# !ansible/inventories/*/group_vars/all/vault.yml.example
 
 # Ansible runtime artifacts
 *.retry
