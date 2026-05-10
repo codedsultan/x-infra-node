@@ -1,0 +1,3 @@
+#!/bin/sh
+./ansible/scripts/preflight.sh
+

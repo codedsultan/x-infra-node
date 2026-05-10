@@ -1,0 +1,73 @@
+---
+# roles/app_runtime_node/tasks/main.yml
+
+- name: Set app directory paths
+  ansible.builtin.set_fact:
+    app_dir: "{{ apps_base_dir }}/app-{{ deploy_env }}"
+    app_compose_path: "{{ apps_base_dir }}/app-{{ deploy_env }}/docker-compose.yml"
+
+- name: Ensure app directory exists
+  ansible.builtin.file:
+    path: "{{ app_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Resolve registry credentials
+  ansible.builtin.set_fact:
+    app_registry: >-
+      {{
+        vault_registries[app.registry_profile]
+        if (app.registry_profile is defined
+            and app.registry_profile
+            and vault_registries is defined
+            and vault_registries[app.registry_profile] is defined)
+        else {}
+      }}
+  no_log: true
+
+- name: Login to container registry
+  community.docker.docker_login:
+    registry_url: "{{ app_registry.url }}"
+    username: "{{ app_registry.username }}"
+    password: "{{ app_registry.token }}"
+    reauthorize: true
+  when:
+    - app_registry | length > 0
+    - app_registry.url is defined
+    - app_registry.token is defined
+    - (app_registry.token | length) > 0
+  no_log: true
+
+- name: Create named volumes
+  ansible.builtin.command: docker volume create {{ item }}
+  loop: "{{ app.volumes_def | default([]) }}"
+  changed_when: false
+
+- name: Render docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ app_compose_path }}"
+    mode: "0644"
+
+- name: Pull latest images
+  ansible.builtin.command: docker compose pull
+  args:
+    chdir: "{{ app_dir }}"
+  environment:
+    TAG: "{{ TAG | default('latest') }}"
+  register: pull_result
+  changed_when: pull_result.rc == 0 and pull_result.stdout is search("Downloaded|Pulling|Digest")
+  failed_when: pull_result.rc != 0
+  when: app_registry | length > 0
+  async: 1800
+  poll: 10
+
+- name: Bring up app
+  ansible.builtin.command: docker compose up -d --remove-orphans
+  args:
+    chdir: "{{ app_dir }}"
+  environment:
+    TAG: "{{ TAG | default('latest') }}"
+  register: up_result
+  changed_when: up_result.rc == 0 and (up_result.stdout is search("Creating|Recreating|Starting") or up_result.stderr is search("Creating|Recreating|Starting"))
+  failed_when: up_result.rc != 0

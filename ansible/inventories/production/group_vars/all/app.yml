@@ -1,0 +1,95 @@
+---
+# -----------------------------------------------------------------------
+# App definition — edit this file to configure your Node.js application.
+# -----------------------------------------------------------------------
+app:
+  # Container image from GHCR (tag is injected at deploy time as $TAG)
+  image: "ghcr.io/yourorg/yourapp:${TAG}"
+
+  # Registry profile key (matches vault_registries in foundation.yml)
+  registry_profile: "ghcr"
+
+  # Public domains for each environment
+  domains:
+    staging: ["staging.example.com"]
+    production: ["example.com"]
+
+  # Which service Caddy routes to, and on what port
+  public_service: app
+  public_service_port: 3000
+
+  # Optional health check path (used to verify Caddy routing after deploy)
+  # caddy_verify_path: "/health"
+
+  # -----------------------------------------------------------------------
+  # Database (remove the entire `db` block if your app has no database)
+  # -----------------------------------------------------------------------
+  db:
+    engine: postgres          # postgres | mariadb
+    name: myapp
+    user: myapp
+    host: "cluster-{{ deploy_env }}-shared-postgres"
+    port: 5432
+    inject: database_url      # database_url | pg_vars | db_vars
+    password_var: "vault_db_myapp_password"
+
+  # -----------------------------------------------------------------------
+  # Environment variables
+  # -----------------------------------------------------------------------
+  env:
+    # Static values — safe to commit
+    base:
+      PORT: "3000"
+      NODE_ENV: "production"
+      LOG_LEVEL: "info"
+      # Add more static env vars here
+
+    # Derived values (Jinja2 expressions resolved at deploy time)
+    derived:
+      REDIS_HOST: "cluster-{{ deploy_env }}-shared-redis"
+      REDIS_PORT: "6379"
+      # DATABASE_URL is injected automatically from db.inject above
+
+    # Keys from vault (never commit actual values — set them in vault.yml)
+    secret_map:
+      JWT_SECRET: "vault_myapp_jwt_secret"
+      REDIS_PASSWORD: "vault_redis_password"
+      # Add more secrets here
+
+    # Optional secrets — app starts fine without them
+    secret_map_optional: {}
+      # MAIL_PASSWORD: "vault_myapp_mail_password"
+
+    # Keys that must be non-empty at deploy time (deployment fails otherwise)
+    required_keys:
+      - PORT
+      - NODE_ENV
+      - DATABASE_URL
+      - JWT_SECRET
+
+  # -----------------------------------------------------------------------
+  # Runtime services
+  # -----------------------------------------------------------------------
+  runtime:
+    services:
+      app:
+        expose: ["3000"]
+        env_file: ".env"
+        healthcheck:
+          test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+          interval: "15s"
+          timeout: "5s"
+          retries: 5
+          start_period: "20s"
+
+      # Optional background worker — remove if not needed
+      worker:
+        command: ["node", "worker.js"]
+        env_file: ".env"
+        depends_on: ["app"]
+
+  # -----------------------------------------------------------------------
+  # Named volumes (remove if your app has no persistent storage)
+  # -----------------------------------------------------------------------
+  # volumes_def:
+  #   - "myapp_{{ deploy_env }}_uploads"
