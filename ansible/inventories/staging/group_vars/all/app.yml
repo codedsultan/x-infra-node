@@ -30,7 +30,7 @@ app:
     user: helloapp
     host: "cluster-{{ deploy_env }}-shared-postgres"
     port: 5432
-    inject: database_url      # database_url | pg_vars | db_vars
+    inject: pg_vars      # database_url | pg_vars | db_vars
     password_var: "vault_db_myapp_password"
     # params:
     #     sslmode: disable
