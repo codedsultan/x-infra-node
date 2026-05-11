@@ -50,7 +50,7 @@ app:
       ENABLE_SWAGGER: "true"
       API_BASE_URL: "https://staging-api.x-social.xurl.fyi"
       # Add more static env vars here
-      DEFAULT_DB: 'postgres
+      DEFAULT_DB: 'postgres'
 
       PG_SSL: 'false'
       PG_CLIENT: 'pg'                         # pg | pg-native
