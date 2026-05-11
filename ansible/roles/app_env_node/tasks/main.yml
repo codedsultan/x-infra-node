@@ -65,11 +65,11 @@
 - name: Build PG_* vars (postgres)
   ansible.builtin.set_fact:
     env_db:
-      PGHOST: "{{ app.db.host }}"
-      PGPORT: "{{ app.db.port | string }}"
-      PGDATABASE: "{{ app.db.name }}"
-      PGUSER: "{{ app.db.user }}"
-      PGPASSWORD: "{{ lookup('vars', app.db.password_var) }}"
+      PG_HOST: "{{ app.db.host }}"
+      PG_PORT: "{{ app.db.port | string }}"
+      PG_DATABASE: "{{ app.db.name }}"
+      PG_USER: "{{ app.db.user }}"
+      PG_PASSWORD: "{{ lookup('vars', app.db.password_var) }}"
   when:
     - app.db is defined
     - app.db.engine == "postgres"

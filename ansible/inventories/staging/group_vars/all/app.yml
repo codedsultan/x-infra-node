@@ -45,10 +45,19 @@ app:
     base:
       PORT: "5000"
       NODE_ENV: "staging"
-      LOG_LEVEL: "info"
+      # LOG_LEVEL: "info"
+      SERVER_MAINTENANCE: 'false'
       ENABLE_SWAGGER: "true"
       API_BASE_URL: "https://staging-api.x-social.xurl.fyi"
       # Add more static env vars here
+      DEFAULT_DB: 'postgres
+
+      PG_SSL: 'false'
+      PG_CLIENT: 'pg'                         # pg | pg-native
+      PG_CONNECTION_NAME: 'postgres'
+      PG_POOL_MIN: 2
+      PG_POOL_MAX: 10
+
 
     # Derived values (Jinja2 expressions resolved at deploy time)
     derived:
@@ -70,8 +79,9 @@ app:
     required_keys:
       - PORT
       - NODE_ENV
-      - DATABASE_URL
+      # - DATABASE_URL
       - JWT_SECRET
+      - DEFAULT_DB
 
   # -----------------------------------------------------------------------
   # Runtime services
