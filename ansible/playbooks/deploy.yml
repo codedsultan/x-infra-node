@@ -48,14 +48,7 @@
         msg: ".env file not found at {{ env_file_path }}"
       when: not env_file_stat.stat.exists
 
-    # Database Migrations
-    - name: Run migrations on running container
-      community.docker.docker_container:
-        name: "app-{{ deploy_env }}-{{ app.public_service }}"
-        command: ["pnpm", "migrate:up"]
-        detach: false
-      register: migrate_result
-      when: deploy_env != 'production'  # Only in staging
+    
 
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -111,6 +104,16 @@
         - health_response.json.database is defined
         - health_response.json.database | dict2items | selectattr('value', 'equalto', false) | list | length > 0
 
+
+    # Database Migrations
+    - name: Run migrations on running container
+      community.docker.docker_container:
+        name: "app-{{ deploy_env }}-{{ app.public_service }}"
+        command: ["pnpm", "migrate:up"]
+        detach: false
+      register: migrate_result
+      when: deploy_env != 'production'  # Only in staging
+
     - name: Display deployment summary
       ansible.builtin.debug:
         msg: |
@@ -121,3 +124,6 @@
           Env file: {{ env_file_path }}
           API URL: https://{{ app.domains[deploy_env][0] }}
           Health Status: {{ health_response.status }}
+
+
+    
