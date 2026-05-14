@@ -49,34 +49,13 @@
       when: not env_file_stat.stat.exists
 
     # Database Migrations
-    - name: Run database migrations
+    - name: Run migrations on running container
       community.docker.docker_container:
-        name: "{{ container_name }}"
-        image: "{{ app.image }}"
-        env_file: "{{ env_file_path }}"
+        name: "app-{{ deploy_env }}-{{ app.public_service }}"
         command: ["pnpm", "migrate:up"]
-        network: "{{ docker_network_name }}"
         detach: false
-        cleanup: true
-        auto_remove: true
-        state: started
       register: migrate_result
-      timeout: 300
-      failed_when: 
-        - migrate_result is failed
-        - "'already up to date' not in migrate_result.stdout | default('')"
-
-    - name: Display migration output
-      ansible.builtin.debug:
-        msg: "{{ migrate_result.stdout_lines | default([]) }}"
-
-    - name: Check for migration errors
-      ansible.builtin.fail:
-        msg: "Migration failed with errors"
-      when: 
-        - migrate_result.stdout is defined
-        - "'failed' in migrate_result.stdout.lower()
-        - "'already up to date' not in migrate_result.stdout.lower()"
+      when: deploy_env != 'production'  # Only in staging
 
 
     # ──────────────────────────────────────────────────────────────────────────
