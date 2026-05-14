@@ -54,12 +54,12 @@
     - name: Run migrations on running container
       community.docker.docker_container_exec:
         container: "app-{{ deploy_env }}-{{ app.public_service }}"
-        command: "node dist/database/scripts/migrations/up.js"
+        command: "node database/scripts/migrations/up.js"
 
     - name: Run seeds on running container (staging only)
       community.docker.docker_container_exec:
         container: "app-{{ deploy_env }}-{{ app.public_service }}"
-        command: "node dist/database/scripts/db/seed.js"
+        command: "node database/scripts/db/seed.js"
       when: deploy_env != 'production'
 
    # Run migrations (all environments)
