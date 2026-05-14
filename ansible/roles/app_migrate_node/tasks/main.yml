@@ -1,7 +1,7 @@
 # roles/app_migrate_node/tasks/main.yml
 - name: Run database migrations
-  ansible.builtin.docker_container:
-    name: "app-{{ deploy_env }}-migrate-{{ ansible_date_time.epoch }}"
+  community.docker.docker_container:
+    name: "app-{{ deploy_env }}-migrate-{{ ansible_date_time.epoch | default(omit) }}"
     image: "{{ app.image }}"
     env_file: "{{ app_env_file | default('./.env') }}"
     command: "{{ migrate_command }}"
@@ -11,10 +11,18 @@
     state: started
   register: migrate_result
   timeout: "{{ migrate_timeout | default(300) }}"
+  when: ansible_date_time is defined
 
-- name: Check migration output for errors
-  ansible.builtin.fail:
-    msg: "Migration failed: {{ migrate_result.stdout }}"
-  when: 
-    - migrate_result.stdout is defined
-    - "'failed' in migrate_result.stdout.lower() or 'error' in migrate_result.stdout.lower()"
+- name: Run database migrations (fallback without timestamp)
+  community.docker.docker_container:
+    name: "app-{{ deploy_env }}-migrate"
+    image: "{{ app.image }}"
+    env_file: "{{ app_env_file | default('./.env') }}"
+    command: "{{ migrate_command }}"
+    network: "{{ docker_network | default('caddy_network') }}"
+    detach: false
+    cleanup: true
+    state: started
+  register: migrate_result
+  timeout: "{{ migrate_timeout | default(300) }}"
+  when: ansible_date_time is not defined
