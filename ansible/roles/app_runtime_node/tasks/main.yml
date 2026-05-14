@@ -62,12 +62,19 @@
   async: 1800
   poll: 10
 
-- name: Stop and remove existing containers (clean slate)
-  ansible.builtin.command: docker compose down --remove-orphans
+# - name: Stop and remove existing containers (clean slate)
+#   ansible.builtin.command: docker compose down --remove-orphans
+#   args:
+#     chdir: "{{ app_dir }}"
+#   ignore_errors: yes
+#   register: down_result
+
+- name: Remove existing app container
+  ansible.builtin.command: docker rm -f app-{{ deploy_env }}-{{ app.public_service }}
   args:
     chdir: "{{ app_dir }}"
   ignore_errors: yes
-  register: down_result
+  register: rm_result
 
 # - name: Bring up app
 #   ansible.builtin.command: docker compose up -d --remove-orphans
