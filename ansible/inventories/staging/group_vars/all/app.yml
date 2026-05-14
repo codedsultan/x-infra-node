@@ -53,13 +53,14 @@ app:
       AUTO_MIGRATE: "false" 
       # Database mode configuration
       DB_MODE: "split"
-      DEFAULT_DB: "{{ 'postgres' if deploy_env == 'production' else 'mysql' }}"
+      DEFAULT_DB: "mongodb"
       SQL_DB: "postgres"
       PG_SSL: "false"
       PG_CLIENT: "pg"                         # pg | pg-native
       PG_CONNECTION_NAME: "postgres"
       PG_POOL_MIN: 2
       PG_POOL_MAX: 10
+      API_PREFIX: "api"
 
       # CORS_ENABLED: "false
 
