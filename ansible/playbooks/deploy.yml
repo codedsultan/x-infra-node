@@ -1,15 +1,9 @@
 # playbooks/deploy.yml
 - name: Deploy Node.js App
   hosts: all
-  gather_facts: false
-  vars:
-    tag: "{{ TAG | default('latest') }}"
+  gather_facts: yes
 
   pre_tasks:
-    - name: Gather facts (required for timestamps)
-      ansible.builtin.setup:
-      when: ansible_date_time is not defined
-
     - name: Run local preflight checks
       delegate_to: localhost
       connection: local
@@ -18,6 +12,7 @@
       ansible.builtin.command: ./scripts/preflight.sh
       args:
         chdir: "{{ playbook_dir }}/.."
+      ignore_errors: false
 
     - name: Assert deploy_env is valid
       ansible.builtin.assert:
@@ -32,74 +27,57 @@
           - app.image is defined
         fail_msg: "app config missing — check group_vars/all/app.yml"
 
-    - name: Debug deployment info
-      ansible.builtin.debug:
-        msg:
-          - "Environment: {{ deploy_env }}"
-          - "Image Tag: {{ tag }}"
-          - "Full Image: {{ app.image | replace('${TAG}', tag) }}"
-
   tasks:
     - name: Generate .env file
       ansible.builtin.include_role:
         name: app_env_node
-      vars:
-        tag: "{{ tag }}"
 
-    - name: Set env file path
+    - name: Set migration variables
       ansible.builtin.set_fact:
-        env_file_path: "{{ apps_base_dir }}/app-{{ deploy_env }}/.env"
-        docker_network: "{{ cluster_network }}"
+        env_file_path: "/srv/apps/app-{{ deploy_env }}/.env"
+        docker_network_name: "cluster_{{ deploy_env }}_shared"
+        container_name: "app-{{ deploy_env }}-migrate-{{ ansible_date_time.epoch }}"
 
-    - name: Verify env file exists
+    - name: Verify .env file exists
       ansible.builtin.stat:
         path: "{{ env_file_path }}"
       register: env_file_stat
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # Database Migrations (Run before app deployment)
-    # ──────────────────────────────────────────────────────────────────────────
+    - name: Fail if .env file missing
+      ansible.builtin.fail:
+        msg: ".env file not found at {{ env_file_path }}"
+      when: not env_file_stat.stat.exists
+
+    # Database Migrations
     - name: Run database migrations
-      ansible.builtin.command:
-        cmd: |
-          docker run --rm \
-            --env-file {{ env_file_path }} \
-            --network {{ docker_network }} \
-            {{ app.image | replace('${TAG}', tag) }} \
-            pnpm migrate:up
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        image: "{{ app.image }}"
+        env_file: "{{ env_file_path }}"
+        command: ["pnpm", "migrate:up"]
+        network: "{{ docker_network_name }}"
+        detach: false
+        cleanup: true
+        auto_remove: true
+        state: started
       register: migrate_result
       timeout: 300
-      changed_when: true
+      failed_when: 
+        - migrate_result is failed
+        - "'already up to date' not in migrate_result.stdout | default('')"
 
     - name: Display migration output
       ansible.builtin.debug:
-        msg: "{{ migrate_result.stdout_lines }}"
+        msg: "{{ migrate_result.stdout_lines | default([]) }}"
 
-    - name: Check migration for errors
+    - name: Check for migration errors
       ansible.builtin.fail:
-        msg: "Migration failed. Check output above."
+        msg: "Migration failed with errors"
       when: 
         - migrate_result.stdout is defined
-        - "'failed' in migrate_result.stdout.lower() or 'error' in migrate_result.stdout.lower()"
+        - "'failed' in migrate_result.stdout.lower()
+        - "'already up to date' not in migrate_result.stdout.lower()"
 
-    # Optional: Seed database (staging only)
-    - name: Seed database (staging only)
-      when: deploy_env == "staging"
-      ansible.builtin.command:
-        cmd: |
-          docker run --rm \
-            --env-file {{ env_file_path }} \
-            --network {{ docker_network }} \
-            {{ app.image | replace('${TAG}', tag) }} \
-            pnpm db:seed
-      register: seed_result
-      changed_when: true
-      failed_when: false
-
-    - name: Log seed result
-      when: deploy_env == "staging" and seed_result.stdout is defined
-      ansible.builtin.debug:
-        msg: "{{ seed_result.stdout_lines }}"
 
     # ──────────────────────────────────────────────────────────────────────────
     # Deploy App Runtime
