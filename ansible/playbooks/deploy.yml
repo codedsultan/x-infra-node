@@ -50,13 +50,66 @@
       changed_when: true
 
 
+  # Consistent approach - both use existing container
     - name: Run migrations on running container
-      community.docker.docker_container:
-        name: "app-{{ deploy_env }}-{{ app.public_service }}"
-        command: ["pnpm", "migrate:up"]
-        detach: false
-      register: migrate_result
-      when: deploy_env != 'production'  # Only in staging
+      community.docker.docker_container_exec:
+        container: "app-{{ deploy_env }}-{{ app.public_service }}"
+        command: "node dist/scripts/migrations/up.js"
+
+    - name: Run seeds on running container (staging only)
+      community.docker.docker_container_exec:
+        container: "app-{{ deploy_env }}-{{ app.public_service }}"
+        command: "node dist/scripts/db/seed.js"
+      when: deploy_env != 'production'
+
+   # Run migrations (all environments)
+    # - name: Run migrations
+    #   community.docker.docker_container:
+    #     name: "app-{{ deploy_env }}-migrate"
+    #     image: "{{ app.image }}:{{ TAG | default('latest') }}"
+    #     command: "node dist/scripts/migrations/up.js"
+    #     detach: false
+    #     auto_remove: true
+    #     env: "{{ app.env | default({}) }}"
+    #   register: migrate_result
+    #   failed_when: migrate_result.rc != 0
+
+    # # Run seeds (only in non-production environments)
+    # - name: Run seeds (staging/development only)
+    #   community.docker.docker_container:
+    #     name: "app-{{ deploy_env }}-seed"
+    #     image: "{{ app.image }}:{{ TAG | default('latest') }}"
+    #     command: "node dist/scripts/db/seed.js"
+    #     detach: false
+    #     auto_remove: true
+    #     env: "{{ app.env | default({}) }}"
+    #   register: seed_result
+    #   failed_when: seed_result.rc != 0
+    #   when: deploy_env != 'production'  # Only run seeds in staging/dev, not production
+
+    # - name: Run migrations on running container
+    #   community.docker.docker_container_exec:
+    #     container: "app-{{ deploy_env }}-{{ app.public_service }}"
+    #     command: "node dist/scripts/migrations/up.js"
+    #   register: migrate_result
+    #   failed_when: migrate_result.rc != 0
+
+
+    # - name: Run seeds (staging/development only)
+    #   community.docker.docker_container:
+    #     name: "app-{{ deploy_env }}-seed"
+    #     image: "{{ app.image }}:{{ TAG | default('latest') }}"
+    #     command: "node dist/scripts/db/seed.js"
+    #     detach: false
+    #     auto_remove: true
+
+    # - name: Run seeds (staging/development only)
+    #   community.docker.docker_container_exec:
+    #     container: "app-{{ deploy_env }}-{{ app.public_service }}"
+    #     command: "node dist/scripts/db/seed.js"
+    #   register: seed_result
+    #   failed_when: seed_result.rc != 0
+    #   when: deploy_env != 'production'
 
     - name: Verify app is reachable
       ansible.builtin.uri:
