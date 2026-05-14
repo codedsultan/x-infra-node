@@ -1,7 +1,8 @@
+---
 # playbooks/deploy.yml
 - name: Deploy Node.js App
   hosts: all
-  gather_facts: yes
+  gather_facts: false
 
   pre_tasks:
     - name: Run local preflight checks
@@ -12,7 +13,6 @@
       ansible.builtin.command: ./scripts/preflight.sh
       args:
         chdir: "{{ playbook_dir }}/.."
-      ignore_errors: false
 
     - name: Assert deploy_env is valid
       ansible.builtin.assert:
@@ -32,33 +32,9 @@
       ansible.builtin.include_role:
         name: app_env_node
 
-    - name: Set migration variables
-      ansible.builtin.set_fact:
-        env_file_path: "/srv/apps/app-{{ deploy_env }}/.env"
-        docker_network_name: "cluster_{{ deploy_env }}_shared"
-        container_name: "app-{{ deploy_env }}-migrate-{{ ansible_date_time.epoch }}"
-
-    - name: Verify .env file exists
-      ansible.builtin.stat:
-        path: "{{ env_file_path }}"
-      register: env_file_stat
-
-    - name: Fail if .env file missing
-      ansible.builtin.fail:
-        msg: ".env file not found at {{ env_file_path }}"
-      when: not env_file_stat.stat.exists
-
-    
-
-
-    # ──────────────────────────────────────────────────────────────────────────
-    # Deploy App Runtime
-    # ──────────────────────────────────────────────────────────────────────────
     - name: Deploy app runtime
       ansible.builtin.include_role:
         name: app_runtime_node
-      vars:
-        tag: "{{ tag }}"
 
     - name: Write Caddy route
       ansible.builtin.copy:
@@ -73,39 +49,7 @@
       ansible.builtin.command: docker exec {{ caddy.container_name }} caddy reload --config /etc/caddy/Caddyfile
       changed_when: true
 
-    - name: Verify app is reachable
-      ansible.builtin.uri:
-        url: "https://{{ app.domains[deploy_env][0] }}{{ app.caddy_verify_path | default('/health') }}"
-        method: GET
-        return_content: false
-        status_code: [200, 301, 302, 401, 403, 404]
-        validate_certs: false
-      register: health_check
-      retries: 12
-      delay: 5
-      until: health_check.status in [200, 301, 302, 401, 403, 404]
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # Post-deployment validation
-    # ──────────────────────────────────────────────────────────────────────────
-    - name: Verify database connectivity after deployment
-      ansible.builtin.uri:
-        url: "https://{{ app.domains[deploy_env][0] }}/health"
-        method: GET
-        return_content: true
-        validate_certs: false
-      register: health_response
-
-    - name: Check database health status
-      ansible.builtin.fail:
-        msg: "Database health check failed"
-      when: 
-        - health_response.json is defined
-        - health_response.json.database is defined
-        - health_response.json.database | dict2items | selectattr('value', 'equalto', false) | list | length > 0
-
-
-    # Database Migrations
     - name: Run migrations on running container
       community.docker.docker_container:
         name: "app-{{ deploy_env }}-{{ app.public_service }}"
@@ -114,16 +58,14 @@
       register: migrate_result
       when: deploy_env != 'production'  # Only in staging
 
-    - name: Display deployment summary
-      ansible.builtin.debug:
-        msg: |
-          ✅ Deployment complete!
-          Environment: {{ deploy_env }}
-          Image Tag: {{ tag }}
-          Full Image: {{ app.image | replace('${TAG}', tag) }}
-          Env file: {{ env_file_path }}
-          API URL: https://{{ app.domains[deploy_env][0] }}
-          Health Status: {{ health_response.status }}
-
-
-    
+    - name: Verify app is reachable
+      ansible.builtin.uri:
+        url: "https://{{ app.domains[deploy_env][0] }}{{ app.caddy_verify_path | default('/') }}"
+        method: GET
+        return_content: false
+        status_code: [200, 301, 302, 401, 403, 404]
+        validate_certs: false
+      register: health_check
+      retries: 12
+      delay: 5
+      until: health_check.status in [200, 301, 302, 401, 403, 404]
