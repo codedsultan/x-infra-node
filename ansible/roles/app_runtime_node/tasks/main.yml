@@ -1,4 +1,3 @@
----
 # roles/app_runtime_node/tasks/main.yml
 
 - name: Set app directory paths
@@ -11,6 +10,10 @@
     path: "{{ app_dir }}"
     state: directory
     mode: "0755"
+
+- name: Debug image tag
+  ansible.builtin.debug:
+    msg: "Deploying with tag: {{ tag | default('latest') }}"
 
 - name: Resolve registry credentials
   ansible.builtin.set_fact:
@@ -48,17 +51,16 @@
     src: docker-compose.yml.j2
     dest: "{{ app_compose_path }}"
     mode: "0644"
+  vars:
+    tag: "{{ tag | default('latest') }}"
 
 - name: Pull latest images
   ansible.builtin.command: docker compose pull
   args:
     chdir: "{{ app_dir }}"
-  environment:
-    TAG: "{{ TAG | default('latest') }}"
   register: pull_result
   changed_when: pull_result.rc == 0 and pull_result.stdout is search("Downloaded|Pulling|Digest")
   failed_when: pull_result.rc != 0
-  when: app_registry | length > 0
   async: 1800
   poll: 10
 
@@ -66,8 +68,17 @@
   ansible.builtin.command: docker compose up -d --remove-orphans
   args:
     chdir: "{{ app_dir }}"
-  environment:
-    TAG: "{{ TAG | default('latest') }}"
   register: up_result
   changed_when: up_result.rc == 0 and (up_result.stdout is search("Creating|Recreating|Starting") or up_result.stderr is search("Creating|Recreating|Starting"))
   failed_when: up_result.rc != 0
+
+- name: Show running containers
+  ansible.builtin.command: docker compose ps
+  args:
+    chdir: "{{ app_dir }}"
+  register: ps_result
+  changed_when: false
+
+- name: Display container status
+  ansible.builtin.debug:
+    msg: "{{ ps_result.stdout_lines }}"
