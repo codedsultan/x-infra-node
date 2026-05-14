@@ -50,13 +50,24 @@ app:
       ENABLE_SWAGGER: "true"
       API_BASE_URL: "https://staging-api.x-social.xurl.fyi"
       # Add more static env vars here
-      DEFAULT_DB: 'postgres'
-
-      PG_SSL: 'false'
-      PG_CLIENT: 'pg'                         # pg | pg-native
-      PG_CONNECTION_NAME: 'postgres'
+      AUTO_MIGRATE: "false" 
+      # Database mode configuration
+      DB_MODE: "split"
+      DEFAULT_DB: "{{ 'postgres' if deploy_env == 'production' else 'mysql' }}"
+      SQL_DB: "postgres"
+      PG_SSL: "false"
+      PG_CLIENT: "pg"                         # pg | pg-native
+      PG_CONNECTION_NAME: "postgres"
       PG_POOL_MIN: 2
       PG_POOL_MAX: 10
+
+      # CORS_ENABLED: "false
+
+      PROMETHEUS_METRICS_PORT: 9464
+      PROMETHEUS_METRICS_ENDPOINT: "/metrics"
+
+      # Enable detailed tracing (default: false in development)
+      OTEL_ENABLE_TRACES: "true"
 
 
     # Derived values (Jinja2 expressions resolved at deploy time)
@@ -70,6 +81,8 @@ app:
       JWT_SECRET: "vault_myapp_jwt_secret"
       REDIS_PASSWORD: "vault_redis_password"
       # Add more secrets here
+      MONGO_URI: "vault_mongo_uri"
+      MONGO_DB_NAME: "vault_mongo_db_name"
 
     # Optional secrets — app starts fine without them
     secret_map_optional: {}

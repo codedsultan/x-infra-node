@@ -1,0 +1,20 @@
+# roles/app_migrate_node/tasks/main.yml
+- name: Run database migrations
+  ansible.builtin.docker_container:
+    name: "app-{{ deploy_env }}-migrate-{{ ansible_date_time.epoch }}"
+    image: "{{ app.image }}"
+    env_file: "{{ app_env_file | default('./.env') }}"
+    command: "{{ migrate_command }}"
+    network: "{{ docker_network | default('caddy_network') }}"
+    detach: false
+    cleanup: true
+    state: started
+  register: migrate_result
+  timeout: "{{ migrate_timeout | default(300) }}"
+
+- name: Check migration output for errors
+  ansible.builtin.fail:
+    msg: "Migration failed: {{ migrate_result.stdout }}"
+  when: 
+    - migrate_result.stdout is defined
+    - "'failed' in migrate_result.stdout.lower() or 'error' in migrate_result.stdout.lower()"

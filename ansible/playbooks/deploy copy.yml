@@ -1,0 +1,62 @@
+---
+# playbooks/deploy.yml
+- name: Deploy Node.js App
+  hosts: all
+  gather_facts: false
+
+  pre_tasks:
+    - name: Run local preflight checks
+      delegate_to: localhost
+      connection: local
+      run_once: true
+      become: false
+      ansible.builtin.command: ./scripts/preflight.sh
+      args:
+        chdir: "{{ playbook_dir }}/.."
+
+    - name: Assert deploy_env is valid
+      ansible.builtin.assert:
+        that:
+          - deploy_env in ["staging", "production"]
+        fail_msg: "deploy_env must be 'staging' or 'production'"
+
+    - name: Assert app is defined
+      ansible.builtin.assert:
+        that:
+          - app is defined
+          - app.image is defined
+        fail_msg: "app config missing — check group_vars/all/app.yml"
+
+  tasks:
+    - name: Generate .env file
+      ansible.builtin.include_role:
+        name: app_env_node
+
+    - name: Deploy app runtime
+      ansible.builtin.include_role:
+        name: app_runtime_node
+
+    - name: Write Caddy route
+      ansible.builtin.copy:
+        dest: "{{ proxy_base_dir }}/apps/app-{{ deploy_env }}.caddy"
+        mode: "0644"
+        content: |
+          {{ app.domains[deploy_env] | join(", ") }} {
+            reverse_proxy app-{{ deploy_env }}-{{ app.public_service }}:{{ app.public_service_port }}
+          }
+
+    - name: Reload Caddy
+      ansible.builtin.command: docker exec {{ caddy.container_name }} caddy reload --config /etc/caddy/Caddyfile
+      changed_when: true
+
+    - name: Verify app is reachable
+      ansible.builtin.uri:
+        url: "https://{{ app.domains[deploy_env][0] }}{{ app.caddy_verify_path | default('/') }}"
+        method: GET
+        return_content: false
+        status_code: [200, 301, 302, 401, 403, 404]
+        validate_certs: false
+      register: health_check
+      retries: 12
+      delay: 5
+      until: health_check.status in [200, 301, 302, 401, 403, 404]

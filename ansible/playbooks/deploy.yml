@@ -1,4 +1,3 @@
----
 # playbooks/deploy.yml
 - name: Deploy Node.js App
   hosts: all
@@ -32,6 +31,54 @@
       ansible.builtin.include_role:
         name: app_env_node
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # Database Migrations
+    # ──────────────────────────────────────────────────────────────────────────
+    - name: Run database migrations
+      ansible.builtin.include_role:
+        name: app_migrate_node
+      vars:
+        migrate_command: "pnpm migrate:up"
+        migrate_timeout: 300  # 5 minutes timeout for migrations
+
+    # Optional: Rollback on failure (blue-green deployment pattern)
+    - name: Test migration success
+      ansible.builtin.command: docker run --rm --env-file .env {{ app.image }} pnpm migrate:status
+      register: migration_status
+      failed_when: false
+
+    - name: Rollback migrations if status check fails
+      when: migration_status.rc != 0
+      block:
+        - name: Rollback last migration
+          ansible.builtin.command: docker run --rm --env-file .env {{ app.image }} pnpm migrate:down
+          register: rollback_result
+        - name: Fail deployment with rollback info
+          ansible.builtin.fail:
+            msg: "Migrations failed and were rolled back. Check migration files."
+      rescue:
+        - name: Fail deployment
+          ansible.builtin.fail:
+            msg: "Migrations failed and rollback also failed. Manual intervention required."
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Seed data (optional, only for staging)
+    # ──────────────────────────────────────────────────────────────────────────
+    - name: Seed database (staging only)
+      when: deploy_env == "staging"
+      ansible.builtin.command: docker run --rm --env-file .env {{ app.image }} pnpm db:seed
+      register: seed_result
+      changed_when: true
+      failed_when: false
+
+    - name: Log seed result
+      when: deploy_env == "staging"
+      ansible.builtin.debug:
+        msg: "{{ seed_result.stdout_lines }}"
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Deploy App
+    # ──────────────────────────────────────────────────────────────────────────
     - name: Deploy app runtime
       ansible.builtin.include_role:
         name: app_runtime_node
@@ -51,7 +98,7 @@
 
     - name: Verify app is reachable
       ansible.builtin.uri:
-        url: "https://{{ app.domains[deploy_env][0] }}{{ app.caddy_verify_path | default('/') }}"
+        url: "https://{{ app.domains[deploy_env][0] }}{{ app.caddy_verify_path | default('/health') }}"
         method: GET
         return_content: false
         status_code: [200, 301, 302, 401, 403, 404]
@@ -60,3 +107,32 @@
       retries: 12
       delay: 5
       until: health_check.status in [200, 301, 302, 401, 403, 404]
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Post-deployment validation
+    # ──────────────────────────────────────────────────────────────────────────
+    - name: Verify database connectivity after deployment
+      ansible.builtin.uri:
+        url: "https://{{ app.domains[deploy_env][0] }}/health"
+        method: GET
+        return_content: true
+        validate_certs: false
+      register: health_response
+
+    - name: Check database health status
+      ansible.builtin.fail:
+        msg: "Database health check failed"
+      when: 
+        - health_response.json is defined
+        - health_response.json.database is defined
+        - health_response.json.database | dict2items | selectattr('value', 'equalto', false) | list | length > 0
+
+    - name: Display deployment summary
+      ansible.builtin.debug:
+        msg: |
+          ✅ Deployment complete!
+          Environment: {{ deploy_env }}
+          Image: {{ app.image }}
+          Migrations: Applied
+          API URL: https://{{ app.domains[deploy_env][0] }}
+          Health Status: {{ health_response.status }}
