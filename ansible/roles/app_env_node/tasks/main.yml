@@ -148,3 +148,10 @@
     group: "{{ env_group }}"
     mode: "{{ env_mode }}"
   no_log: true
+
+
+# At the end of the file, after writing the .env file
+- name: Export env_path for other roles
+  ansible.builtin.set_fact:
+    env_file_path: "{{ env_path }}"
+    cacheable: true

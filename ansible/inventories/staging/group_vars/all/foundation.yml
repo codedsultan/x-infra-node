@@ -20,3 +20,6 @@ vault_registries:
     url: ghcr.io
     username: "{{ vault_ghcr_username }}"
     token: "{{ vault_ghcr_token }}"
+
+env_file_path: "{{ apps_base_dir }}/app-{{ deploy_env }}/.env"
+docker_network: "{{ cluster_network }}"

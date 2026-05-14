@@ -4,6 +4,10 @@
   gather_facts: false
 
   pre_tasks:
+    - name: Gather facts (required for timestamps)
+      ansible.builtin.setup:
+      when: ansible_date_time is not defined
+
     - name: Run local preflight checks
       delegate_to: localhost
       connection: local
@@ -31,28 +35,88 @@
       ansible.builtin.include_role:
         name: app_env_node
 
+    # Construct the absolute path to the .env file
+    - name: Set env file path
+      ansible.builtin.set_fact:
+        env_file_path: "{{ apps_base_dir }}/app-{{ deploy_env }}/.env"
+        docker_network: "{{ cluster_network }}"
+
+    - name: Debug env file path
+      ansible.builtin.debug:
+        msg: 
+          - "Environment file: {{ env_file_path }}"
+          - "Docker network: {{ docker_network }}"
+          - "App image: {{ app.image }}"
+
+    - name: Verify env file exists
+      ansible.builtin.stat:
+        path: "{{ env_file_path }}"
+      register: env_file_stat
+
+    - name: Fail if env file doesn't exist
+      ansible.builtin.fail:
+        msg: "Environment file not found at {{ env_file_path }}"
+      when: not env_file_stat.stat.exists
+
     # ──────────────────────────────────────────────────────────────────────────
     # Database Migrations
     # ──────────────────────────────────────────────────────────────────────────
+    - name: Pull latest image for migration
+      community.docker.docker_image:
+        name: "{{ app.image }}"
+        source: pull
+        force_source: true
+
     - name: Run database migrations
-      ansible.builtin.include_role:
-        name: app_migrate_node
-      vars:
-        migrate_command: "pnpm migrate:up"
-        migrate_timeout: 300  # 5 minutes timeout for migrations
+      ansible.builtin.command:
+        cmd: |
+          docker run --rm \
+            --env-file {{ env_file_path }} \
+            --network {{ docker_network }} \
+            {{ app.image }} \
+            pnpm migrate:up
+      register: migrate_result
+      timeout: 300
+      changed_when: true
+
+    - name: Display migration output
+      ansible.builtin.debug:
+        msg: "{{ migrate_result.stdout_lines }}"
+
+    - name: Check migration for errors
+      ansible.builtin.fail:
+        msg: "Migration failed. Check output above."
+      when: 
+        - migrate_result.stdout is defined
+        - "'failed' in migrate_result.stdout.lower() or 'error' in migrate_result.stdout.lower()"
 
     # Optional: Rollback on failure (blue-green deployment pattern)
     - name: Test migration success
-      ansible.builtin.command: docker run --rm --env-file .env {{ app.image }} pnpm migrate:status
+      ansible.builtin.command: |
+        docker run --rm \
+          --env-file {{ env_file_path }} \
+          --network {{ docker_network }} \
+          {{ app.image }} \
+          pnpm migrate:status
       register: migration_status
       failed_when: false
+      changed_when: false
 
     - name: Rollback migrations if status check fails
       when: migration_status.rc != 0
       block:
         - name: Rollback last migration
-          ansible.builtin.command: docker run --rm --env-file .env {{ app.image }} pnpm migrate:down
+          ansible.builtin.command: |
+            docker run --rm \
+              --env-file {{ env_file_path }} \
+              --network {{ docker_network }} \
+              {{ app.image }} \
+              pnpm migrate:down
           register: rollback_result
+          changed_when: true
+        - name: Display rollback output
+          ansible.builtin.debug:
+            msg: "{{ rollback_result.stdout_lines }}"
         - name: Fail deployment with rollback info
           ansible.builtin.fail:
             msg: "Migrations failed and were rolled back. Check migration files."
@@ -66,13 +130,18 @@
     # ──────────────────────────────────────────────────────────────────────────
     - name: Seed database (staging only)
       when: deploy_env == "staging"
-      ansible.builtin.command: docker run --rm --env-file .env {{ app.image }} pnpm db:seed
+      ansible.builtin.command: |
+        docker run --rm \
+          --env-file {{ env_file_path }} \
+          --network {{ docker_network }} \
+          {{ app.image }} \
+          pnpm db:seed
       register: seed_result
       changed_when: true
       failed_when: false
 
     - name: Log seed result
-      when: deploy_env == "staging"
+      when: deploy_env == "staging" and seed_result.stdout is defined
       ansible.builtin.debug:
         msg: "{{ seed_result.stdout_lines }}"
 
@@ -133,6 +202,9 @@
           ✅ Deployment complete!
           Environment: {{ deploy_env }}
           Image: {{ app.image }}
+          Env file: {{ env_file_path }}
+          Network: {{ docker_network }}
           Migrations: Applied
+          {{ 'Seed: Applied' if deploy_env == 'staging' else '' }}
           API URL: https://{{ app.domains[deploy_env][0] }}
           Health Status: {{ health_response.status }}
