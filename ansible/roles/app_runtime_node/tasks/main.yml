@@ -69,22 +69,18 @@
 #   ignore_errors: yes
 #   register: down_result
 
-- name: Remove existing app container
+- name: Force remove existing app container (to avoid name conflict)
   ansible.builtin.command: docker rm -f app-{{ deploy_env }}-{{ app.public_service }}
   args:
     chdir: "{{ app_dir }}"
   ignore_errors: yes
   register: rm_result
 
-# - name: Bring up app
-#   ansible.builtin.command: docker compose up -d --remove-orphans
-#   args:
-#     chdir: "{{ app_dir }}"
-#   environment:
-#     TAG: "{{ TAG | default('latest') }}"
-#   register: up_result
-#   changed_when: up_result.rc == 0 and (up_result.stdout is search("Creating|Recreating|Starting") or up_result.stderr is search("Creating|Recreating|Starting"))
-#   failed_when: up_result.rc != 0
+- name: Bring down any existing compose resources
+  ansible.builtin.command: docker compose down --remove-orphans
+  args:
+    chdir: "{{ app_dir }}"
+  ignore_errors: yes
 
 - name: Bring up app with fresh containers
   ansible.builtin.command: docker compose up -d
