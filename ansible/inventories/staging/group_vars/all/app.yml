@@ -49,6 +49,9 @@ app:
       SERVER_MAINTENANCE: 'false'
       ENABLE_SWAGGER: "true"
       API_BASE_URL: "https://staging-api.x-social.xurl.fyi"
+      MODERATOR_URL:    "https://staging-moderator.x-social.xurl.fyi"
+      MODERATOR_WEBHOOK_ENABLED: true
+      MODERATOR_WEBHOOK_TIMEOUT_MS: 200
       # Add more static env vars here
       AUTO_MIGRATE: "false" 
       # Database mode configuration
@@ -85,6 +88,7 @@ app:
       MONGO_URI: "vault_mongo_uri"
       MONGO_DB_NAME: "vault_mongo_db_name"
       ADMIN_API_KEY: "vault_xsocials_api_hmac_secret"
+      
 
     # Optional secrets — app starts fine without them
     secret_map_optional: {}
