@@ -84,6 +84,7 @@ app:
       # Add more secrets here
       MONGO_URI: "vault_mongo_uri"
       MONGO_DB_NAME: "vault_mongo_db_name"
+      ADMIN_API_KEY: "vault_xsocials_api_hmac_secret"
 
     # Optional secrets — app starts fine without them
     secret_map_optional: {}
