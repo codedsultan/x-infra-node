@@ -74,6 +74,10 @@ app:
       # Enable detailed tracing (default: false in development)
       OTEL_ENABLE_TRACES: "true"
 
+      SMTP_HOST: "smtp-relay.brevo.com"
+      SMTP_PORT: "587"
+      SMTP_FROM: "no-reply@xurl.fyi"
+
 
     # Derived values (Jinja2 expressions resolved at deploy time)
     derived:
@@ -89,7 +93,8 @@ app:
       MONGO_URI: "vault_mongo_uri"
       MONGO_DB_NAME: "vault_mongo_db_name"
       ADMIN_API_KEY: "vault_xsocials_api_hmac_secret"
-      
+      SMTP_USER: "vault_smtp_user"
+      SMTP_KEY:  "vault_smtp_key"
 
     # Optional secrets — app starts fine without them
     secret_map_optional: {}
