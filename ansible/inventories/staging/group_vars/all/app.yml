@@ -50,8 +50,9 @@ app:
       ENABLE_SWAGGER: "true"
       API_BASE_URL: "https://staging-api.x-social.xurl.fyi"
       MODERATOR_URL:    "https://staging-moderator.x-social.xurl.fyi"
+      # docker exec 0f02814e3855 printenv | grep MODERATOR_URL
       MODERATOR_WEBHOOK_ENABLED: true
-      MODERATOR_WEBHOOK_TIMEOUT_MS: 200
+      MODERATOR_WEBHOOK_TIMEOUT_MS: 5000 #200
       # Add more static env vars here
       AUTO_MIGRATE: "false" 
       # Database mode configuration
