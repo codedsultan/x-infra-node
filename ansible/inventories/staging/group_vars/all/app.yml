@@ -76,7 +76,8 @@ app:
 
       SMTP_HOST: "smtp-relay.brevo.com"
       SMTP_PORT: "587"
-      SMTP_FROM: "no-reply@xurl.fyi"
+      # SMTP_FROM: "no-reply@xurl.fyi"
+      SMTP_FROM: "no-reply@infinibriumglobal.com"
 
       EMAIL_QUEUE: "true"
 
