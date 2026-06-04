@@ -78,6 +78,8 @@ app:
       SMTP_PORT: "587"
       SMTP_FROM: "no-reply@xurl.fyi"
 
+      EMAIL_QUEUE: "true"
+
 
     # Derived values (Jinja2 expressions resolved at deploy time)
     derived:
@@ -128,6 +130,17 @@ app:
       #   command: ["node", "worker.js"]
       #   env_file: ".env"
       #   depends_on: ["app"]
+
+      worker:
+        command: ["node", "dist/workers/emailWorker.js"]
+        env_file: ".env"
+        depends_on: ["app"]
+        healthcheck:
+          test: ["CMD-SHELL", "test -f /proc/1/status || exit 1"]
+          interval: "30s"
+          timeout: "5s"
+          retries: 3
+          start_period: "10s"
 
   # -----------------------------------------------------------------------
   # Named volumes (remove if your app has no persistent storage)
