@@ -78,6 +78,7 @@ app:
       SMTP_PORT: "587"
       # SMTP_FROM: "no-reply@xurl.fyi"
       SMTP_FROM: "no-reply@infinibriumglobal.com"
+      SMTP_FROM_NAME: "X Socials"
 
       EMAIL_QUEUE: "true"
 
